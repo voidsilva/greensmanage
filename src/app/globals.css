@@ -1,26 +1,238 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+/* ── Design tokens ─────────────────────────────────────────── */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg: #e7f5ec;
+  --bg-2: #c9f1d9;
+  --ink: #05301a;
+  --muted: rgb(5 48 26 / 0.62);
+  --faint: rgb(5 48 26 / 0.42);
+  --glass-a: rgb(255 255 255 / 0.72);
+  --glass-b: rgb(255 255 255 / 0.38);
+  --rim: rgb(255 255 255 / 0.95);
+  --rim-2: rgb(15 181 101 / 0.18);
+  --line: rgb(5 48 26 / 0.09);
+  --chip: rgb(5 48 26 / 0.06);
+  --shadow: 0 24px 50px -26px rgb(6 70 36 / 0.45);
+  --pos: #0a9a52;
+  --neg: #d8304a;
+  --warn: #b87806;
+  --blob-1: #5cf0a0;
+  --blob-2: #d6ff7a;
+  --blob-3: #8ef5c0;
+  color-scheme: light;
+}
+[data-theme='dark'] {
+  --bg: #03140c;
+  --bg-2: #0b3a22;
+  --ink: #ecfff4;
+  --muted: rgb(220 255 236 / 0.64);
+  --faint: rgb(220 255 236 / 0.38);
+  --glass-a: rgb(255 255 255 / 0.13);
+  --glass-b: rgb(255 255 255 / 0.04);
+  --rim: rgb(255 255 255 / 0.42);
+  --rim-2: rgb(125 255 181 / 0.12);
+  --line: rgb(255 255 255 / 0.08);
+  --chip: rgb(255 255 255 / 0.07);
+  --shadow: 0 24px 60px -24px rgb(0 0 0 / 0.7);
+  --pos: #7dffb5;
+  --neg: #ff6b7d;
+  --warn: #ffc65c;
+  --blob-1: #1fd677;
+  --blob-2: #b6ff4f;
+  --blob-3: #0fae5f;
+  color-scheme: dark;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-hanken), -apple-system, 'SF Pro Display', system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
+  --color-bg: var(--bg);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-line: var(--line);
+  --color-chip: var(--chip);
+  --color-pos: var(--pos);
+  --color-neg: var(--neg);
+  --color-warn: var(--warn);
+  --color-green-1: #22e07a;
+  --color-green-2: #0fb565;
+  --color-green-3: #7dffb5;
+  --color-lime: #c6ff5e;
+  --radius-glass: 26px;
+  --radius-glass-xl: 30px;
+  --ease-spring: cubic-bezier(0.3, 1.4, 0.5, 1);
+  --ease-out-soft: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* ── Base ──────────────────────────────────────────────────── */
+@layer base {
+  html,
+  body {
+    min-height: 100%;
+  }
+  body {
+    @apply bg-bg font-sans text-ink antialiased;
+    overflow-x: hidden;
+    transition:
+      background 0.5s,
+      color 0.5s;
+  }
+  button {
+    cursor: pointer;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-green-1);
+    outline-offset: 3px;
+    border-radius: 12px;
+  }
+  [hidden] {
+    display: none !important;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* ── Liquid glass ──────────────────────────────────────────── */
+@utility glass {
+  --mx: 30%;
+  --my: -20%;
+  position: relative;
+  isolation: isolate;
+  border-radius: var(--radius-glass);
+  background: linear-gradient(145deg, var(--glass-a) 0%, var(--glass-b) 48%, var(--glass-a) 140%);
+  backdrop-filter: blur(26px) saturate(190%);
+  -webkit-backdrop-filter: blur(26px) saturate(190%);
+  box-shadow:
+    inset 0 1px 0 var(--rim),
+    inset 0 -1px 0 rgb(255 255 255 / 0.06),
+    inset 1px 0 0 rgb(255 255 255 / 0.08),
+    var(--shadow),
+    0 2px 6px rgb(0 0 0 / 0.12);
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    z-index: -1;
+    pointer-events: none;
+    background: linear-gradient(160deg, var(--rim), rgb(255 255 255 / 0.03) 36%, var(--rim-2) 70%, rgb(255 255 255 / 0.3));
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+  }
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    z-index: -1;
+    pointer-events: none;
+    background:
+      radial-gradient(420px circle at var(--mx) var(--my), rgb(255 255 255 / 0.14), transparent 45%),
+      radial-gradient(120% 60% at 20% -10%, rgb(255 255 255 / 0.12), transparent 55%);
+  }
+}
+/* real refraction on Chromium: the SVG lens displaces the backdrop near the edges */
+@utility lens {
+  backdrop-filter: url(#liquid) blur(8px) saturate(200%) brightness(1.05);
+  -webkit-backdrop-filter: blur(14px) saturate(200%);
+}
+@utility btn-primary {
+  color: #03230f;
+  background: linear-gradient(145deg, #b6ffd8, #22e07a 60%, #14c56b);
+  box-shadow:
+    0 12px 30px -8px rgb(34 224 122 / 0.8),
+    inset 0 1px 0 rgb(255 255 255 / 0.85);
+}
+@utility shine {
+  --mx: 50%;
+  --my: 50%;
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  &::before {
+    content: '';
+    position: absolute;
+    inset: -30%;
+    z-index: -1;
+    background: radial-gradient(circle at var(--mx) var(--my), rgb(255 255 255 / 0.45), transparent 35%);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  &:hover::before {
+    opacity: 1;
+  }
+}
+
+/* ── Motion ────────────────────────────────────────────────── */
+@keyframes float {
+  50% {
+    transform: translate(50px, -36px) scale(1.1);
+  }
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
+  }
+}
+@keyframes pop {
+  from {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+}
+@keyframes pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 rgb(255 107 125 / 0.6);
+  }
+  70%,
+  100% {
+    box-shadow: 0 0 0 8px rgb(255 107 125 / 0);
+  }
+}
+@keyframes shake {
+  20%,
+  60% {
+    transform: translateX(-6px);
+  }
+  40%,
+  80% {
+    transform: translateX(6px);
+  }
+}
+@keyframes row-in {
+  from {
+    background: rgb(61 240 143 / 0.28);
+    transform: translateY(-6px);
+    opacity: 0;
+  }
+}
+@utility animate-rise {
+  animation: rise 0.8s var(--ease-out-soft) both;
+}
+@utility animate-pop {
+  animation: pop 0.35s cubic-bezier(0.3, 1.5, 0.5, 1) both;
+}
+@utility animate-float {
+  animation: float 20s ease-in-out infinite;
+}
+@utility animate-shake {
+  animation: shake 0.45s;
+}
+@utility animate-row-in {
+  animation: row-in 1s var(--ease-out-soft);
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
 }

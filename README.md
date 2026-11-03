@@ -1,36 +1,66 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# GreensManage
 
-## Getting Started
+Painel de gestão de banca de apostas esportivas, com login, em vidro líquido verde.
 
-First, run the development server:
+## Stack
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+| Camada | Tecnologia |
+|---|---|
+| App | Next.js 16 (App Router, Server Components, Server Actions, Cache Components) |
+| Linguagem | TypeScript strict |
+| UI | React 19, Tailwind CSS 4, Motion, Lucide |
+| Banco | Postgres + Drizzle ORM (migrações versionadas em `drizzle/`) |
+| Auth | Senha com scrypt, sessão JWT (jose) em cookie HttpOnly, bloqueio após 5 erros |
+| Validação | Zod em toda entrada do usuário |
+| Testes | Vitest (regras de negócio e senha) |
+
+## Estrutura
+
+```
+src/
+  app/
+    (auth)/login/        tela de login
+    (app)/page.tsx       painel (protegido)
+    actions/             Server Actions: auth.ts, bets.ts
+    layout.tsx           fontes, tema sem flash, filtro de vidro
+  components/
+    auth/                formulário de login
+    dashboard/           um componente por card do painel
+    ui/                  primitivos: Card, Chip, Segmented, Sparkline, Toast...
+  db/                    schema.ts (tabelas) e cliente Drizzle
+  lib/
+    dal.ts               Data Access Layer: cookie → usuário (único ponto de auth)
+    session.ts           criar/ler/apagar sessão
+    password.ts          hash scrypt
+    stats.ts             todos os números do painel (função pura, testada)
+    queries.ts           leitura do banco para o painel
+  proxy.ts               barra quem não tem sessão antes de renderizar
+scripts/seed.ts          cria o usuário dono e o histórico de exemplo
+drizzle/                 migrações SQL
+tests/                   Vitest
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+As tabelas ficam no schema Postgres `greensmanage`, então o app pode dividir um banco com outros projetos.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Rodar localmente
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+cp .env.example .env.local   # preencha DATABASE_URL, SESSION_SECRET e SEED_PASSWORD
+npm install
+npm run db:migrate           # cria o schema e as tabelas
+npm run db:seed              # cria o usuário e 30 dias de histórico
+npm run dev
+```
 
-## Learn More
+## Qualidade
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npm run check   # typecheck + lint + testes
+npm run build
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Deploy (Vercel)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. Variáveis no projeto: `DATABASE_URL` (URL com pooler) e `SESSION_SECRET` (`openssl rand -hex 32`).
+2. Rode `npm run db:migrate` e `npm run db:seed` apontando para o banco de produção.
+3. Para trocar a senha: rode `npm run db:seed` de novo com outra `SEED_PASSWORD`. O histórico é mantido.
