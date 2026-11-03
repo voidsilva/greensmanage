@@ -1,56 +1,73 @@
 # GreensManage
 
-Painel de gestão de banca de apostas esportivas, com login, em vidro líquido verde.
+SaaS de gestão de banca para apostas esportivas: cada cliente cria a conta, registra as entradas e acompanha banca, ROI, taxa de acerto e meta mensal. Interface em vidro líquido verde, tema claro e escuro, pronta para celular.
+
+## Dois modos
+
+| Modo | Quando | O que acontece |
+|---|---|---|
+| **Demo** | sem variáveis do Supabase | Uma conta demo (`demo@greensmanage.app` / `demo1234`) com 30 dias de dados de exemplo. O que o visitante muda fica num cookie assinado, só dele. Bom para mostrar a clientes. |
+| **Supabase** | `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` definidas | Cadastro, login, confirmação por e-mail, recuperação de senha e dados reais. Cada usuário só enxerga os próprios dados (Row Level Security no Postgres). |
 
 ## Stack
 
 | Camada | Tecnologia |
 |---|---|
-| App | Next.js 16 (App Router, Server Components, Server Actions, Cache Components) |
+| App | Next.js 16 (App Router, Server Components, Server Actions, Cache Components, Proxy) |
 | Linguagem | TypeScript strict |
 | UI | React 19, Tailwind CSS 4, Motion, Lucide |
-| Banco | Postgres + Drizzle ORM (migrações versionadas em `drizzle/`) |
-| Auth | Senha com scrypt, sessão JWT (jose) em cookie HttpOnly, bloqueio após 5 erros |
+| Backend | Supabase: Auth + Postgres com RLS, migrações em `supabase/migrations` |
 | Validação | Zod em toda entrada do usuário |
-| Testes | Vitest (regras de negócio e senha) |
+| Testes | Vitest |
 
 ## Estrutura
 
 ```
 src/
   app/
-    (auth)/login/        tela de login
-    (app)/page.tsx       painel (protegido)
-    actions/             Server Actions: auth.ts, bets.ts
-    layout.tsx           fontes, tema sem flash, filtro de vidro
+    (auth)/              login, cadastro, esqueci-senha, nova-senha
+    (app)/               painel (/) e minha conta (/conta), protegidos
+    auth/confirm/        recebe os links de e-mail do Supabase
+    actions/             Server Actions: auth, bets, profile
   components/
-    auth/                formulário de login
+    auth/ account/       formulários
     dashboard/           um componente por card do painel
     ui/                  primitivos: Card, Chip, Segmented, Sparkline, Toast...
-  db/                    schema.ts (tabelas) e cliente Drizzle
   lib/
-    dal.ts               Data Access Layer: cookie → usuário (único ponto de auth)
-    session.ts           criar/ler/apagar sessão
-    password.ts          hash scrypt
+    backend/             interface única + implementações supabase.ts e demo.ts
+    supabase/            clientes (server, proxy) e tipos do banco
+    dal.ts               Data Access Layer: requisição → usuário
     stats.ts             todos os números do painel (função pura, testada)
-    queries.ts           leitura do banco para o painel
-  proxy.ts               barra quem não tem sessão antes de renderizar
-scripts/seed.ts          cria o usuário dono e o histórico de exemplo
-drizzle/                 migrações SQL
+    validation.ts        schemas Zod
+  proxy.ts               renova a sessão e barra quem não está logado
+supabase/
+  migrations/            tabelas, RLS, trigger que cria o perfil no cadastro
+  config.toml
 tests/                   Vitest
 ```
-
-As tabelas ficam no schema Postgres `greensmanage`, então o app pode dividir um banco com outros projetos.
 
 ## Rodar localmente
 
 ```bash
-cp .env.example .env.local   # preencha DATABASE_URL, SESSION_SECRET e SEED_PASSWORD
 npm install
-npm run db:migrate           # cria o schema e as tabelas
-npm run db:seed              # cria o usuário e 30 dias de histórico
+cp .env.example .env.local   # deixe o Supabase vazio para o modo demo
 npm run dev
 ```
+
+## Ligar o Supabase
+
+1. Crie um projeto em supabase.com e copie a URL e a publishable key (Project Settings → API) para `.env.local` / Vercel.
+2. Aplique o banco:
+   ```bash
+   npx supabase login
+   npm run db:link     # escolha o projeto
+   npm run db:push     # roda supabase/migrations
+   npm run db:types    # opcional: regenera os tipos
+   ```
+3. Em Authentication → URL Configuration, coloque a URL do site e adicione `https://SEU-DOMINIO/auth/confirm` nas Redirect URLs.
+4. Em Authentication → Email Templates, troque o link dos modelos "Confirm signup" e "Reset password" para
+   `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type={{ .Type }}&next={{ .RedirectTo }}`.
+5. Faça um novo deploy (as variáveis `NEXT_PUBLIC_*` entram no build).
 
 ## Qualidade
 
@@ -58,9 +75,3 @@ npm run dev
 npm run check   # typecheck + lint + testes
 npm run build
 ```
-
-## Deploy (Vercel)
-
-1. Variáveis no projeto: `DATABASE_URL` (URL com pooler) e `SESSION_SECRET` (`openssl rand -hex 32`).
-2. Rode `npm run db:migrate` e `npm run db:seed` apontando para o banco de produção.
-3. Para trocar a senha: rode `npm run db:seed` de novo com outra `SEED_PASSWORD`. O histórico é mantido.

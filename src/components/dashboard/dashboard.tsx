@@ -14,6 +14,7 @@ import { MarketBars } from './market-bars';
 import { ProfitCalendar } from './profit-calendar';
 import { StreakCard } from './streak-card';
 import { NewBetSheet } from './new-bet-sheet';
+import { EmptyState } from './empty-state';
 
 export function Dashboard({ data }: { data: DashboardData }) {
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -39,7 +40,8 @@ export function Dashboard({ data }: { data: DashboardData }) {
       <div className="relative z-10 mx-auto grid min-h-dvh max-w-[1580px] gap-3.5 p-3.5 md:grid-cols-[88px_minmax(0,1fr)] md:gap-5 md:p-5">
         <Sidebar />
         <main id="top" className="flex min-w-0 flex-col gap-3.5 pb-24 md:gap-5 md:pb-0">
-          <Topbar name={data.user.name} />
+          <Topbar name={data.user.name} demo={data.mode === 'demo'} />
+          {data.recent.length === 0 && <EmptyState onNewBet={() => setSheetOpen(true)} />}
           <div className="grid grid-cols-1 gap-3.5 md:gap-5 xl:grid-cols-12">
             <BankHero
               stats={stats}

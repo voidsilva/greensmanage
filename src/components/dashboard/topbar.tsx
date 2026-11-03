@@ -1,9 +1,10 @@
 'use client';
 
 import { AnimatePresence, motion } from 'motion/react';
-import { Bell, LogOut, Moon, Sun } from 'lucide-react';
+import { Bell, LogOut, Moon, Settings, Sun } from 'lucide-react';
 import { useEffect, useState, useSyncExternalStore } from 'react';
-import { logout } from '@/app/actions/auth';
+import Link from 'next/link';
+import { signOut } from '@/app/actions/auth';
 import { useToast } from '@/components/ui/toast';
 
 const iconBtn = 'glass lens grid size-[46px] flex-none place-items-center rounded-full text-ink';
@@ -43,7 +44,7 @@ function greeting() {
   return h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite';
 }
 
-export function Topbar({ name }: { name: string }) {
+export function Topbar({ name, demo }: { name: string; demo: boolean }) {
   const toast = useToast();
   const { theme, toggle } = useTheme();
   const hello = useSyncExternalStore(noop, greeting, () => 'Olá');
@@ -75,20 +76,27 @@ export function Topbar({ name }: { name: string }) {
           <Bell className="size-5" />
           <span className="absolute top-[11px] right-3 size-2 rounded-full bg-lime shadow-[0_0_10px_var(--color-lime)]" />
         </button>
-        <form action={logout}>
+        <Link href="/conta" className={`${iconBtn} md:hidden`} aria-label="Minha conta">
+          <Settings className="size-5" />
+        </Link>
+        <form action={signOut}>
           <button className={iconBtn} aria-label="Sair" title="Sair">
             <LogOut className="size-5" />
           </button>
         </form>
-        <div className="glass lens hidden flex-none items-center gap-3 rounded-full py-1.5 pr-4 pl-1.5 md:flex">
+        <Link
+          href="/conta"
+          aria-label="Minha conta"
+          className="glass lens hidden flex-none items-center gap-3 rounded-full py-1.5 pr-4 pl-1.5 md:flex"
+        >
           <span className="grid size-[38px] place-items-center rounded-full border-[1.5px] border-white/35 bg-linear-145 from-[#1b6b42] to-[#0d3d25] text-[13px] font-bold text-[#eafff3]">
             {initials}
           </span>
           <span>
             <b className="block text-sm uppercase">{name}</b>
-            <small className="text-xs text-muted">GreensManage Pro</small>
+            <small className="text-xs text-muted">{demo ? 'Conta demo' : 'Minha conta'}</small>
           </span>
-        </div>
+        </Link>
       </div>
     </header>
   );

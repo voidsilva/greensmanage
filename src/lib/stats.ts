@@ -1,5 +1,5 @@
 import { MARKET_KEYS, WINDOW_DAYS, daysAgo, profitOf, type BetView } from './domain';
-import type { Market } from '@/db/schema';
+import type { Market } from '@/lib/supabase/database.types';
 
 export type Day = { d: number; pl: number; n: number; g: number; staked: number; balance: number };
 

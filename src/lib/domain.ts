@@ -1,4 +1,4 @@
-import type { BetStatus, Market } from '@/db/schema';
+import type { BetStatus, Market } from '@/lib/supabase/database.types';
 
 export const MARKETS: Record<Market, string> = {
   over_under: 'Over/Under gols',

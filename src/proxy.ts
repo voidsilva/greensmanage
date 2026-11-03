@@ -1,33 +1,49 @@
-import { NextResponse, type NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
+import { NextResponse, type NextRequest } from 'next/server';
+import { supabaseConfig } from '@/lib/config';
+import { updateSession } from '@/lib/supabase/proxy';
 
 /**
- * Optimistic gate only: bounces requests without a valid token before rendering.
- * The real authorization check lives in the Data Access Layer (src/lib/dal.ts)
- * and in every Server Action.
+ * Optimistic gate: refreshes the session and bounces signed-out visitors before
+ * rendering. Real authorization happens again in the DAL, in every Server
+ * Action and, in Supabase mode, in Postgres Row Level Security.
  */
-const COOKIE = 'gm_session';
-const PUBLIC = ['/login'];
+const GUEST_ONLY = ['/login', '/cadastro', '/esqueci-senha'];
+const OPEN = ['/auth/confirm'];
+
+async function demoSignedIn(req: NextRequest) {
+  const token = req.cookies.get('gm_demo')?.value;
+  if (!token) return false;
+  try {
+    const secret = process.env.SESSION_SECRET ?? 'greensmanage-demo-only-not-a-secret-0001';
+    const { payload } = await jwtVerify(token, new TextEncoder().encode(secret), {
+      algorithms: ['HS256'],
+    });
+    return payload.demo === true;
+  } catch {
+    return false;
+  }
+}
 
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
-  const isPublic = PUBLIC.includes(pathname);
-  const token = req.cookies.get(COOKIE)?.value;
-  let valid = false;
-  if (token && process.env.SESSION_SECRET) {
-    try {
-      await jwtVerify(token, new TextEncoder().encode(process.env.SESSION_SECRET), {
-        issuer: 'greensmanage',
-        algorithms: ['HS256'],
-      });
-      valid = true;
-    } catch {}
+  if (OPEN.some((p) => pathname.startsWith(p))) return NextResponse.next();
+
+  const cfg = supabaseConfig();
+  const { res, signedIn } = cfg
+    ? await updateSession(req, cfg)
+    : { res: NextResponse.next(), signedIn: await demoSignedIn(req) };
+
+  const guestOnly = GUEST_ONLY.includes(pathname);
+  if (!signedIn && !guestOnly) {
+    const url = new URL('/login', req.url);
+    if (pathname !== '/') url.searchParams.set('next', pathname);
+    return NextResponse.redirect(url);
   }
-  if (!isPublic && !valid) return NextResponse.redirect(new URL('/login', req.url));
-  if (isPublic && valid) return NextResponse.redirect(new URL('/', req.url));
-  return NextResponse.next();
+  if (signedIn && guestOnly) return NextResponse.redirect(new URL('/', req.url));
+  return res;
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|icon.svg|robots.txt).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|icon.svg|grain.svg|robots.txt).*)'],
 };

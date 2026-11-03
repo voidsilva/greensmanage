@@ -1,69 +1,73 @@
 'use server';
 
-import { eq, sql } from 'drizzle-orm';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
-import { db, schema } from '@/db';
-import { DUMMY_HASH, verifyPassword } from '@/lib/password';
-import { createSession, deleteSession } from '@/lib/session';
+import { backend } from '@/lib/backend';
 
-const MAX_FAILS = 5;
-const LOCK_MINUTES = 15;
+export type FormState = { error?: string; notice?: string; email?: string; at: number } | undefined;
 
-const LoginSchema = z.object({
-  username: z.string().trim().toLowerCase().min(1, 'Informe o usuário.').max(40),
-  password: z.string().min(1, 'Informe a senha.').max(200),
-  remember: z.literal('on').optional(),
+const email = z.string().trim().toLowerCase().email('Informe um e-mail válido.').max(254);
+const password = z
+  .string()
+  .min(8, 'A senha precisa de pelo menos 8 caracteres.')
+  .max(72, 'Senha longa demais.')
+  .regex(/[A-Za-z]/, 'Use pelo menos uma letra.')
+  .regex(/\d/, 'Use pelo menos um número.');
+
+const fail = (error: string, extra: Partial<NonNullable<FormState>> = {}): FormState => ({
+  error,
+  at: Date.now(),
+  ...extra,
 });
+const first = (e: z.ZodError) => e.issues[0]?.message ?? 'Dados inválidos.';
 
-export type LoginState = { error?: string; username?: string; at?: number } | undefined;
+/** Only same-site relative paths, so `next` can't redirect off-site. */
+const safeNext = (v: FormDataEntryValue | null) => {
+  const s = typeof v === 'string' ? v : '';
+  return s.startsWith('/') && !s.startsWith('//') ? s : '/';
+};
 
-export async function login(_prev: LoginState, form: FormData): Promise<LoginState> {
-  const parsed = LoginSchema.safeParse({
-    username: form.get('username'),
-    password: form.get('password'),
-    remember: form.get('remember') ?? undefined,
-  });
-  if (!parsed.success) return { error: parsed.error.issues[0]?.message, at: Date.now() };
-  const { username, password, remember } = parsed.data;
+export async function signIn(_: FormState, form: FormData): Promise<FormState> {
+  const parsed = z
+    .object({ email, password: z.string().min(1, 'Informe a senha.').max(200) })
+    .safeParse({ email: form.get('email'), password: form.get('password') });
+  if (!parsed.success) return fail(first(parsed.error), { email: String(form.get('email') ?? '') });
+  const r = await backend().signIn(parsed.data.email, parsed.data.password);
+  if (r.error) return fail(r.error, { email: parsed.data.email });
+  redirect(safeNext(form.get('next')));
+}
 
-  const [user] = await db()
-    .select()
-    .from(schema.users)
-    .where(eq(schema.users.username, username))
-    .limit(1);
-
-  if (user?.lockedUntil && user.lockedUntil > new Date()) {
-    const min = Math.ceil((user.lockedUntil.getTime() - Date.now()) / 60_000);
-    return { username, error: `Muitas tentativas. Tente de novo em ${min} min.`, at: Date.now() };
-  }
-
-  // Always run scrypt, so a missing user takes as long as a wrong password.
-  const ok = await verifyPassword(password, user?.passwordHash ?? DUMMY_HASH);
-
-  if (!user || !ok) {
-    if (user) {
-      await db()
-        .update(schema.users)
-        .set({
-          failedLogins: sql`${schema.users.failedLogins} + 1`,
-          lockedUntil: sql`case when ${schema.users.failedLogins} + 1 >= ${MAX_FAILS}
-            then now() + make_interval(mins => ${LOCK_MINUTES}) else null end`,
-        })
-        .where(eq(schema.users.id, user.id));
-    }
-    return { username, error: 'Usuário ou senha incorretos.', at: Date.now() };
-  }
-
-  await db()
-    .update(schema.users)
-    .set({ failedLogins: 0, lockedUntil: null })
-    .where(eq(schema.users.id, user.id));
-  await createSession({ sub: user.id, name: user.name }, remember === 'on');
+export async function signUp(_: FormState, form: FormData): Promise<FormState> {
+  const parsed = z
+    .object({ name: z.string().trim().min(2, 'Informe seu nome.').max(80), email, password })
+    .safeParse(Object.fromEntries(form));
+  if (!parsed.success) return fail(first(parsed.error), { email: String(form.get('email') ?? '') });
+  const { name, email: e, password: p } = parsed.data;
+  const r = await backend().signUp(name, e, p);
+  if (r.error) return fail(r.error, { email: e });
+  if (r.notice) return { notice: r.notice, at: Date.now() };
   redirect('/');
 }
 
-export async function logout() {
-  await deleteSession();
+export async function requestReset(_: FormState, form: FormData): Promise<FormState> {
+  const parsed = email.safeParse(form.get('email'));
+  if (!parsed.success) return fail(first(parsed.error));
+  const r = await backend().requestPasswordReset(parsed.data);
+  return r.error ? fail(r.error) : { notice: r.notice, at: Date.now() };
+}
+
+export async function updatePassword(_: FormState, form: FormData): Promise<FormState> {
+  const parsed = z
+    .object({ password, confirm: z.string() })
+    .refine((v) => v.password === v.confirm, { message: 'As senhas não conferem.' })
+    .safeParse(Object.fromEntries(form));
+  if (!parsed.success) return fail(first(parsed.error));
+  const r = await backend().updatePassword(parsed.data.password);
+  if (r.error) return fail(r.error);
+  redirect('/');
+}
+
+export async function signOut() {
+  await backend().signOut();
   redirect('/login');
 }
